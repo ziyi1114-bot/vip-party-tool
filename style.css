@@ -1,0 +1,238 @@
+/* =================================================================
+   VIP Party Tool — style.css
+   設計目標：舊款 iPad 直式 Safari、大按鈕、大字體、單手好操作
+   原則：避免大量動畫、blur、box-shadow、filter，改用純色與粗邊框
+   ================================================================= */
+
+/* ---- 基礎重置 ---- */
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1); /* 點擊回饋 */
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: -apple-system, "PingFang TC", "Heiti TC", "Microsoft JhengHei", sans-serif;
+  background: #0f1830;
+  color: #f4f6fb;
+  /* 避免長按選取文字干擾操作 */
+  -webkit-user-select: none;
+  user-select: none;
+  /* 安全區（瀏海/圓角）內距 */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* ---- 畫面切換 ---- */
+.screen {
+  display: none;
+  min-height: 100vh;
+  padding: 24px;
+  flex-direction: column;
+}
+.screen.active {
+  display: flex;
+}
+.hidden {
+  display: none !important;
+}
+
+/* ---- 首頁 ---- */
+.app-title {
+  font-size: 48px;
+  font-weight: 800;
+  text-align: center;
+  margin: 40px 0 48px;
+  letter-spacing: 2px;
+}
+.home-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  max-width: 560px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* ---- 通用按鈕：刻意做大，方便觸控 ---- */
+.btn {
+  display: block;
+  width: 100%;
+  padding: 28px 24px;
+  font-size: 32px;
+  font-weight: 700;
+  color: #f4f6fb;
+  background: #2a3c63;
+  border: 3px solid #44588a;
+  border-radius: 16px;
+  cursor: pointer;
+  text-align: center;
+  touch-action: manipulation; /* 移除點擊延遲 */
+  -webkit-appearance: none;
+  appearance: none;
+}
+.btn:active {
+  background: #1f2d4d; /* 唯一的「動畫」：按下變色 */
+}
+.btn-primary  { background: #2f6fed; border-color: #5a90ff; }
+.btn-success  { background: #1f9d57; border-color: #3fd089; }
+.btn-warn     { background: #c98a16; border-color: #f0b54a; }
+.btn-danger   { background: #b23b3b; border-color: #e06a6a; }
+
+/* 首頁遊戲按鈕更高 */
+.home-menu .btn {
+  padding: 40px 24px;
+  font-size: 36px;
+}
+
+/* ---- 遊戲頁首（返回鍵 + 名稱） ---- */
+.game-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.btn-back {
+  font-size: 26px;
+  font-weight: 700;
+  color: #f4f6fb;
+  background: #2a3c63;
+  border: 3px solid #44588a;
+  border-radius: 14px;
+  padding: 14px 22px;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.btn-back:active { background: #1f2d4d; }
+.game-name {
+  font-size: 30px;
+  font-weight: 800;
+}
+
+/* ---- 待機 / 進行 / 總結 區塊共用排版 ---- */
+.game-lobby,
+.game-play,
+.game-summary,
+.game-done {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+  flex: 1;
+  justify-content: center;
+}
+
+.big-msg {
+  font-size: 40px;
+  font-weight: 800;
+  text-align: center;
+  margin: 0;
+}
+
+/* =========================== 猜人名 =========================== */
+.gp-counter {
+  font-size: 30px;
+  font-weight: 700;
+  text-align: center;
+}
+.gp-image-box {
+  width: 100%;
+  /* 用固定高度的圖框，避免換圖時版面跳動 */
+  height: 56vh;
+  background: #1a2745;
+  border: 3px solid #44588a;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.gp-image {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  display: block;
+}
+
+/* =========================== 比手畫腳 =========================== */
+.seconds-label {
+  font-size: 30px;
+  font-weight: 700;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+}
+.seconds-input {
+  font-size: 44px;
+  font-weight: 800;
+  text-align: center;
+  width: 220px;
+  padding: 16px;
+  color: #f4f6fb;
+  background: #1a2745;
+  border: 3px solid #44588a;
+  border-radius: 14px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.ch-timer {
+  font-size: 120px;
+  font-weight: 800;
+  text-align: center;
+  line-height: 1;
+  font-variant-numeric: tabular-nums; /* 數字等寬，倒數不晃動 */
+}
+.ch-timer.warning { color: #ff7a7a; } /* 最後幾秒變紅，純色不用動畫 */
+.ch-stats {
+  display: flex;
+  justify-content: space-around;
+  font-size: 28px;
+  font-weight: 700;
+}
+.ch-word-box {
+  background: #1a2745;
+  border: 3px solid #44588a;
+  border-radius: 16px;
+  padding: 48px 24px;
+  text-align: center;
+  min-height: 30vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ch-word {
+  font-size: 64px;
+  font-weight: 800;
+  word-break: break-all;
+}
+.ch-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* =========================== 猜歌名 =========================== */
+.playlist-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* ---- 直式優先；若橫放給多一點留白 ---- */
+@media (orientation: landscape) {
+  .gp-image-box { height: 60vh; }
+  .ch-timer { font-size: 96px; }
+}

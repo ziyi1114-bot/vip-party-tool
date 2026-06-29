@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <!-- 直式 iPad 優化：禁止使用者縮放，避免誤觸放大 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#1b2a4a">
+
+  <!-- iOS / iPad 加入主畫面（PWA）相關設定 -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VIP Party">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+  <title>VIP Party Tool</title>
+</head>
+<body>
+
+  <!-- ============================================================
+       畫面 (screen) 結構：單頁多 section，靠 .active class 切換顯示
+       切換不重新載入頁面 → 返回鍵不會清掉遊戲進度
+       ============================================================ -->
+
+  <!-- 首頁 -->
+  <section id="screen-home" class="screen active">
+    <h1 class="app-title">VIP Party Tool</h1>
+    <!-- 三顆遊戲大按鈕由 script.js 依 GAMES 註冊表動態產生 -->
+    <nav id="home-menu" class="home-menu"></nav>
+  </section>
+
+  <!-- 一、猜人名 -->
+  <section id="screen-guess-people" class="screen">
+    <header class="game-header">
+      <button class="btn-back" data-back>← 返回</button>
+      <span class="game-name">猜人名</span>
+    </header>
+
+    <!-- 開始前的待機畫面 -->
+    <div class="game-lobby" data-gp-lobby>
+      <button class="btn btn-primary" data-gp-start>開始遊戲</button>
+      <button class="btn btn-danger" data-gp-reset>重製</button>
+    </div>
+
+    <!-- 進行中畫面 -->
+    <div class="game-play hidden" data-gp-play>
+      <div class="gp-counter" data-gp-counter>剩餘題數：--</div>
+      <div class="gp-image-box">
+        <img class="gp-image" data-gp-image alt="人物圖片" decoding="async">
+      </div>
+      <button class="btn btn-primary" data-gp-next>下一題</button>
+    </div>
+
+    <!-- 題庫出完畫面 -->
+    <div class="game-done hidden" data-gp-done>
+      <p class="big-msg">題目已全部出完</p>
+      <button class="btn btn-danger" data-gp-reset>重製</button>
+    </div>
+  </section>
+
+  <!-- 二、比手畫腳 -->
+  <section id="screen-charades" class="screen">
+    <header class="game-header">
+      <button class="btn-back" data-back>← 返回</button>
+      <span class="game-name">比手畫腳</span>
+    </header>
+
+    <!-- 開始前的待機畫面 -->
+    <div class="game-lobby" data-ch-lobby>
+      <label class="seconds-label">
+        遊戲秒數
+        <input type="number" class="seconds-input" data-ch-seconds min="5" max="600" step="5" value="60" inputmode="numeric">
+      </label>
+      <button class="btn btn-primary" data-ch-start>開始遊戲</button>
+      <button class="btn btn-danger" data-ch-reset>重製</button>
+    </div>
+
+    <!-- 進行中畫面 -->
+    <div class="game-play hidden" data-ch-play>
+      <div class="ch-timer" data-ch-timer>60</div>
+      <div class="ch-stats">
+        <span data-ch-correct>答對：0</span>
+        <span data-ch-remain>剩餘：--</span>
+      </div>
+      <div class="ch-word-box">
+        <span class="ch-word" data-ch-word>--</span>
+      </div>
+      <div class="ch-actions">
+        <button class="btn btn-success" data-ch-correct-btn>答對／下一題</button>
+        <button class="btn btn-warn" data-ch-pass-btn>PASS</button>
+      </div>
+    </div>
+
+    <!-- 回合總結畫面 -->
+    <div class="game-summary hidden" data-ch-summary>
+      <p class="big-msg">⏰ 時間到！</p>
+      <p class="big-msg">本回合答對：<span data-ch-final>0</span> 題</p>
+      <button class="btn btn-primary" data-ch-nextround>開始下一回合</button>
+      <button class="btn" data-back>返回首頁</button>
+    </div>
+
+    <!-- 題庫出完畫面 -->
+    <div class="game-done hidden" data-ch-done>
+      <p class="big-msg">題目已全部出完</p>
+      <button class="btn btn-danger" data-ch-reset>重製</button>
+    </div>
+  </section>
+
+  <!-- 三、猜歌名 -->
+  <section id="screen-playlists" class="screen">
+    <header class="game-header">
+      <button class="btn-back" data-back>← 返回</button>
+      <span class="game-name">猜歌名</span>
+    </header>
+    <!-- 歌單按鈕由 script.js 依 playlists.json 動態產生 -->
+    <nav class="playlist-menu" data-pl-menu></nav>
+  </section>
+
+  <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,2 @@
+# 請把猜人名用的人物圖片放在這個資料夾。
+# 檔名需與 data/guess-people.json 裡的 "image" 欄位一致，例如 images/jay.jpg
