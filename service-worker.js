@@ -11,7 +11,7 @@
    更新版本時：把 CACHE_VERSION 改成新數字即可讓快取重建。
    ================================================================= */
 
-var CACHE_VERSION = 'vpt-v2';
+var CACHE_VERSION = 'vpt-v3';
 
 // 安裝時要預先快取的核心檔案（相對路徑，GitHub Pages 子目錄也適用）
 var PRECACHE_URLS = [

@@ -93,20 +93,38 @@ var Util = {
     }
   },
 
-  /* 播放單一柔和音：三角波 + 淡入淡出包絡，避免方波的尖銳與爆音 */
-  _tone: function (ctx, freq, startTime, duration) {
+  /* 播放單一柔和音：三角波 + 淡入淡出包絡，避免方波的尖銳與爆音。
+     peak 為音量峰值（預設 0.16）；短音自動縮短淡入時間讓它更俐落 */
+  _tone: function (ctx, freq, startTime, duration, peak) {
+    peak = peak || 0.16;
+    var attack = Math.min(0.03, duration * 0.4);
     var osc = ctx.createOscillator();
     var gain = ctx.createGain();
     osc.type = 'triangle';           // 比 square 柔和許多
     osc.frequency.value = freq;
     // 用指數包絡（不能到 0，故用極小值）：快速淡入、平滑淡出，消除硬起硬停的「喀」聲
     gain.gain.setValueAtTime(0.0001, startTime);
-    gain.gain.exponentialRampToValueAtTime(0.16, startTime + 0.03);
+    gain.gain.exponentialRampToValueAtTime(peak, startTime + attack);
     gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
     osc.connect(gain);
     gain.connect(ctx.destination);
     osc.start(startTime);
     osc.stop(startTime + duration + 0.02);
+  },
+
+  /* 短促「滴／答」聲，用於比手畫腳最後 10 秒。
+     high 決定高音或低音，交替呼叫即成時鐘般的滴答節奏 */
+  tickSound: function (high) {
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      if (!Util._audioCtx) Util._audioCtx = new Ctx();
+      var ctx = Util._audioCtx;
+      if (ctx.state === 'suspended') ctx.resume();
+      Util._tone(ctx, high ? 1100 : 820, ctx.currentTime, 0.06, 0.13);
+    } catch (e) {
+      /* 不支援就靜默 */
+    }
   },
 
   /* 提示音（Web Audio），用於比手畫腳時間到。
@@ -153,6 +171,43 @@ var Util = {
       setTimeout(function () { locked = false; }, ms || 250);
       return fn.apply(self, args);
     };
+  },
+
+  /* 螢幕防休眠（Screen Wake Lock）。
+     request/release 由路由呼叫；系統在切到背景時會自動釋放螢幕鎖，
+     故切回前景需重新取得（見啟動時的 visibilitychange）。
+     不支援的裝置（如較舊 iOS）會靜默略過，不影響其它功能。 */
+  wakeLock: {
+    _lock: null,
+    _wanted: false,   // 目前是否「想要」保持螢幕不休眠（在遊戲中）
+
+    request: function () {
+      Util.wakeLock._wanted = true;
+      Util.wakeLock._acquire();
+    },
+
+    release: function () {
+      Util.wakeLock._wanted = false;
+      if (Util.wakeLock._lock) {
+        try { Util.wakeLock._lock.release(); } catch (e) {}
+        Util.wakeLock._lock = null;
+      }
+    },
+
+    _acquire: function () {
+      if (!Util.wakeLock._wanted) return;
+      if (Util.wakeLock._lock) return;
+      if (!('wakeLock' in navigator)) return;
+      try {
+        navigator.wakeLock.request('screen').then(function (lock) {
+          Util.wakeLock._lock = lock;
+          // 系統自動釋放時清掉參照，回前景才能再次取得
+          lock.addEventListener('release', function () {
+            Util.wakeLock._lock = null;
+          });
+        }).catch(function () { /* 被拒或不支援，忽略 */ });
+      } catch (e) {}
+    }
   }
 };
 
@@ -193,6 +248,10 @@ var Router = {
     }
     var game = GameRegistry.byId(hash);
     if (game && game.onEnter) game.onEnter();
+
+    // 遊戲畫面保持螢幕不休眠，回首頁釋放
+    if (hash === 'home') Util.wakeLock.release();
+    else Util.wakeLock.request();
 
     Router.current = hash;
     window.scrollTo(0, 0);
@@ -488,6 +547,8 @@ var Charades = (function () {
       return;
     }
     renderTimer();
+    // 最後 10 秒開始滴答（高低交替像時鐘），倒數結束由 timeUp 的提示音收尾
+    if (remainingTime <= 10) Util.tickSound(remainingTime % 2 === 0);
   }
 
   function startTimer() {
@@ -527,7 +588,7 @@ var Charades = (function () {
     });
   }
 
-  // 開始一個回合（沿用目前 state.idx，答對歸零、倒數重開）
+  // 開始一個回合（沿用目前 state.idx，答對歸零）：先 3 秒準備倒數，再正式開始
   function beginRound() {
     if (state.idx >= state.order.length) {
       showPhase('done');
@@ -535,9 +596,35 @@ var Charades = (function () {
     }
     state.correct = 0;
     Util.storage.set(KEY, state);
+    showPhase('play');
+    countdownThenStart();
+  }
+
+  // 3、2、1 準備倒數；期間鎖住按鈕、題目顯示「準備…」，倒數結束才發題與計時
+  function countdownThenStart() {
+    clearTimer();
+    lockButtons(true);
+    dom.word.textContent = '準備…';
+    dom.correct.textContent = '答對：' + state.correct;
+    dom.remain.textContent = '剩餘：' + (state.order.length - state.idx);
+    var count = 3;
+    dom.timer.classList.remove('warning');
+    dom.timer.textContent = count;
+    timerId = setInterval(function () {
+      count--;
+      if (count <= 0) {
+        clearTimer();
+        startRound();
+        return;
+      }
+      dom.timer.textContent = count;
+    }, 1000);
+  }
+
+  // 真正開始本回合：解鎖按鈕、發題、開始遊戲倒數
+  function startRound() {
     remainingTime = state.seconds;
     lockButtons(false);
-    showPhase('play');
     renderWord();
     startTimer();
   }
@@ -711,4 +798,9 @@ window.addEventListener('DOMContentLoaded', function () {
   Router.apply();
 
   registerServiceWorker();
+
+  // 切回前景時，若仍在遊戲中則重新取得螢幕鎖（切到背景會被系統自動釋放）
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') Util.wakeLock._acquire();
+  });
 });
