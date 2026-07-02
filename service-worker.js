@@ -11,7 +11,8 @@
    更新版本時：把 CACHE_VERSION 改成新數字即可讓快取重建。
    ================================================================= */
 
-var CACHE_VERSION = 'vpt-v3';
+// 發新版時，把此處與 script.js 的 APP_VERSION 一起 +1（見 CLAUDE.md）
+var CACHE_VERSION = 'vpt-v4';
 
 // 安裝時要預先快取的核心檔案（相對路徑，GitHub Pages 子目錄也適用）
 var PRECACHE_URLS = [

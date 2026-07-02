@@ -14,6 +14,10 @@
 
 'use strict';
 
+/* 顯示在首頁的版本號。發新版時把這裡與 service-worker.js 的 CACHE_VERSION
+   一起 +1（見 CLAUDE.md），使用者就能在首頁確認裝置吃到哪一版。 */
+var APP_VERSION = 'v4';
+
 /* =================================================================
    共用工具模組
    ================================================================= */
@@ -776,16 +780,34 @@ function bindBackButtons() {
 }
 
 function registerServiceWorker() {
-  if ('serviceWorker' in navigator) {
-    // 用相對路徑，GitHub Pages 子目錄也適用
-    navigator.serviceWorker.register('service-worker.js').catch(function () {
-      /* 註冊失敗不影響功能 */
+  if (!('serviceWorker' in navigator)) return;
+
+  // 自動更新：偵測到新版 Service Worker 接管時自動重載一次，
+  // 讓使用者「開一次 App 就換到最新版」，免手動移除重加。
+  // 只有原本就有 SW 控制（＝是「更新」而非首次安裝）才重載，避免首次安裝多跳一次。
+  if (navigator.serviceWorker.controller) {
+    var refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
     });
   }
+
+  // 用相對路徑，GitHub Pages 子目錄也適用
+  navigator.serviceWorker.register('service-worker.js').catch(function () {
+    /* 註冊失敗不影響功能 */
+  });
+}
+
+function showAppVersion() {
+  var el = document.querySelector('[data-app-version]');
+  if (el) el.textContent = '版本 ' + APP_VERSION;
 }
 
 window.addEventListener('DOMContentLoaded', function () {
   buildHomeMenu();
+  showAppVersion();
   bindBackButtons();
 
   // 初始化各遊戲（綁定按鈕事件）

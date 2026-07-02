@@ -58,6 +58,15 @@ body {
   margin: 0 auto;
 }
 
+/* 首頁版本號：推到底部、低調灰字 */
+.app-version {
+  margin-top: auto;
+  padding-top: 24px;
+  text-align: center;
+  font-size: 18px;
+  color: #6b7ba6;
+}
+
 /* ---- 通用按鈕：刻意做大，方便觸控 ---- */
 .btn {
   display: block;
