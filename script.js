@@ -77,25 +77,50 @@ var Util = {
     return window.confirm('確定要重製嗎？目前進度會被清除。');
   },
 
-  /* 簡單提示音（Web Audio），用於比手畫腳時間到 */
+  /* 共用 AudioContext 單例。iOS/iPadOS Safari 規定必須在「使用者手勢」
+     當下建立並 resume，否則之後（如計時器回呼）播放會被靜音策略擋掉。 */
+  _audioCtx: null,
+
+  /* 於使用者手勢（例如按「開始遊戲」）當下呼叫，解鎖音訊 */
+  unlockAudio: function () {
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      if (!Util._audioCtx) Util._audioCtx = new Ctx();
+      if (Util._audioCtx.state === 'suspended') Util._audioCtx.resume();
+    } catch (e) {
+      /* 不支援就靜默，不影響其它功能 */
+    }
+  },
+
+  /* 播放單一柔和音：三角波 + 淡入淡出包絡，避免方波的尖銳與爆音 */
+  _tone: function (ctx, freq, startTime, duration) {
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = 'triangle';           // 比 square 柔和許多
+    osc.frequency.value = freq;
+    // 用指數包絡（不能到 0，故用極小值）：快速淡入、平滑淡出，消除硬起硬停的「喀」聲
+    gain.gain.setValueAtTime(0.0001, startTime);
+    gain.gain.exponentialRampToValueAtTime(0.16, startTime + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(startTime);
+    osc.stop(startTime + duration + 0.02);
+  },
+
+  /* 提示音（Web Audio），用於比手畫腳時間到。
+     柔和「叮—咚」兩聲，明顯但不刺耳。重用已解鎖的單例 context（不 close） */
   beep: function () {
     try {
       var Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) return;
-      var ctx = new Ctx();
-      var osc = ctx.createOscillator();
-      var gain = ctx.createGain();
-      osc.type = 'square';
-      osc.frequency.value = 880;
-      gain.gain.value = 0.2;
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      // 響 0.6 秒後關閉
-      setTimeout(function () {
-        osc.stop();
-        ctx.close();
-      }, 600);
+      if (!Util._audioCtx) Util._audioCtx = new Ctx();
+      var ctx = Util._audioCtx;
+      if (ctx.state === 'suspended') ctx.resume();
+      var t = ctx.currentTime;
+      Util._tone(ctx, 659.25, t, 0.35);        // E5（叮）
+      Util._tone(ctx, 523.25, t + 0.32, 0.5);  // C5（咚）
     } catch (e) {
       /* 某些舊 Safari 不支援，忽略即可 */
     }
@@ -114,6 +139,20 @@ var Util = {
   },
   qa: function (root, attr) {
     return root.querySelectorAll('[' + attr + ']');
+  },
+
+  /* 按鈕防連點：包裝一個 handler，點擊後立即鎖定，ms 後自動解除，
+     鎖定期間再次點擊直接忽略。每次呼叫產生獨立的鎖（每顆按鈕各自計時），
+     所以「答對」與「PASS」不會互相卡住。預設 250ms，不影響正常操作速度。 */
+  guard: function (fn, ms) {
+    var locked = false;
+    return function () {
+      if (locked) return;
+      locked = true;
+      var self = this, args = arguments;
+      setTimeout(function () { locked = false; }, ms || 250);
+      return fn.apply(self, args);
+    };
   }
 };
 
@@ -179,25 +218,64 @@ var GameRegistry = {
 var GuessPeople = (function () {
   var KEY = 'vpt:guessPeople';
   var DATA_PATH = 'data/guess-people.json';
+  var WINDOW = 5;       // 預載視窗大小（前幾張優先 + 後方維持張數）
 
-  var people = [];     // 原始題庫（含 name/image）
+  var people = [];      // 原始題庫（含 name/image）
   var screen, dom = {}; // DOM 參照
   var state = null;     // { order:[原始index...], idx:Number }
+  var preloadedSet = {};// 已預載的原始 index（避免重複建 Image）
+  var loading = false;  // 前幾張圖預載中（避免長時間下載期間重複觸發開始）
+  var answerShown = false; // 目前是否顯示答案（僅檢視狀態，不寫進存檔）
 
   function cacheDom() {
     screen = document.getElementById('screen-guess-people');
     dom.lobby   = Util.q(screen, 'data-gp-lobby');
+    dom.loading = Util.q(screen, 'data-gp-loading');
     dom.play    = Util.q(screen, 'data-gp-play');
     dom.done    = Util.q(screen, 'data-gp-done');
     dom.counter = Util.q(screen, 'data-gp-counter');
     dom.image   = Util.q(screen, 'data-gp-image');
+    dom.answer       = Util.q(screen, 'data-gp-answer');
+    dom.answerToggle = Util.q(screen, 'data-gp-answer-toggle');
+    // 可見圖片載入失敗也記一筆，避免破圖無提示
+    dom.image.onerror = function () {
+      console.warn('圖片載入失敗：' + dom.image.src);
+    };
   }
 
-  // 顯示三個區塊其中之一
+  // 顯示四個區塊其中之一（lobby / loading / play / done）
   function showPhase(phase) {
     dom.lobby.classList.toggle('hidden', phase !== 'lobby');
+    dom.loading.classList.toggle('hidden', phase !== 'loading');
     dom.play.classList.toggle('hidden', phase !== 'play');
     dom.done.classList.toggle('hidden', phase !== 'done');
+  }
+
+  // 預載單張圖片。回傳 Promise；成功或失敗都 resolve（失敗只 warn，不中斷）
+  function preloadImage(src) {
+    return new Promise(function (resolve) {
+      var img = new Image();
+      img.onload = function () { resolve(); };
+      img.onerror = function () {
+        console.warn('圖片載入失敗：' + src);
+        resolve();
+      };
+      img.src = src;
+    });
+  }
+
+  // 預載 order[fromIdx .. fromIdx+count-1] 中尚未預載者。回傳 Promise（全數完成）
+  function preloadWindow(fromIdx, count) {
+    if (!state) return Promise.resolve();
+    var promises = [];
+    var end = Math.min(fromIdx + count, state.order.length);
+    for (var i = fromIdx; i < end; i++) {
+      var origIdx = state.order[i];
+      if (preloadedSet[origIdx]) continue;
+      preloadedSet[origIdx] = true;
+      promises.push(preloadImage(people[origIdx].image));
+    }
+    return Promise.all(promises);
   }
 
   // 依目前 state 渲染畫面
@@ -211,36 +289,68 @@ var GuessPeople = (function () {
     showPhase('play');
 
     var person = people[state.order[state.idx]];
-    // 只更新 img.src（不重建節點），符合效能要求
+    // 只更新 img.src（不重建節點）；已預載者會直接命中快取
     dom.image.src = person.image;
     dom.image.alt = '人物圖片';
 
     var remain = state.order.length - state.idx;
     dom.counter.textContent = '剩餘題數：' + remain;
 
-    // 預載下一張，讓「下一題」更順
-    preloadNext();
+    // 換題自動恢復隱藏答案
+    hideAnswer();
+
+    // 維持後方約 WINDOW 張預載（不等按下一題才下載）
+    preloadWindow(state.idx, WINDOW);
   }
 
-  function preloadNext() {
-    var nextIdx = state.idx + 1;
-    if (nextIdx < state.order.length) {
-      var img = new Image();
-      img.src = people[state.order[nextIdx]].image;
+  // 隱藏答案並重置切換鈕
+  function hideAnswer() {
+    answerShown = false;
+    if (dom.answer) {
+      dom.answer.classList.add('hidden');
+      dom.answer.textContent = '';
+    }
+    if (dom.answerToggle) dom.answerToggle.textContent = '顯示答案';
+  }
+
+  // 切換答案顯示／隱藏
+  function toggleAnswer() {
+    if (!state || state.idx >= state.order.length) return;
+    answerShown = !answerShown;
+    if (answerShown) {
+      dom.answer.textContent = people[state.order[state.idx]].name;
+      dom.answer.classList.remove('hidden');
+      dom.answerToggle.textContent = '隱藏答案';
+    } else {
+      hideAnswer();
     }
   }
 
-  // 開始遊戲：載入題庫 → 洗牌 → 存檔 → 渲染
+  // 開始遊戲：載入題庫 → 洗牌 → 存檔 → 優先預載前 WINDOW 張 → 進入
   function start() {
+    if (loading) return; // 前幾張還在載，忽略重複觸發
     Util.loadJSON(DATA_PATH).then(function (data) {
       people = data;
       var order = [];
       for (var i = 0; i < people.length; i++) order.push(i);
       Util.shuffle(order);
       state = { order: order, idx: 0 };
+      preloadedSet = {};
       Util.storage.set(KEY, state);
-      render();
+
+      // 優先預載前 WINDOW 張（不足則全部），完成即可開始
+      loading = true;
+      showPhase('loading');
+      var head = Math.min(WINDOW, order.length);
+      preloadWindow(0, head).then(function () {
+        loading = false;
+        showPhase('play');
+        render();
+        // 其餘圖片背景慢慢預載（不 await）
+        preloadWindow(head, order.length);
+      });
     }).catch(function (err) {
+      loading = false;
       alert('讀取題庫失敗：' + err.message);
     });
   }
@@ -249,13 +359,15 @@ var GuessPeople = (function () {
     if (!state) return;
     state.idx++;
     Util.storage.set(KEY, state);
-    render();
+    render(); // render 內會維持後方預載視窗
   }
 
   function reset() {
     if (!Util.confirmReset()) return;
     Util.storage.remove(KEY);
     state = null;
+    preloadedSet = {};
+    hideAnswer();
     showPhase('lobby');
   }
 
@@ -268,7 +380,8 @@ var GuessPeople = (function () {
       Util.loadJSON(DATA_PATH).then(function (data) {
         people = data;
         state = saved;
-        render();
+        preloadedSet = {};
+        render(); // 會預熱目前位置附近的圖
       }).catch(function () {
         showPhase('lobby');
       });
@@ -283,11 +396,14 @@ var GuessPeople = (function () {
     // 同一畫面內可能有多顆 reset（play/done 區），全部綁定
     var i;
     var starts = Util.qa(screen, 'data-gp-start');
-    for (i = 0; i < starts.length; i++) starts[i].addEventListener('click', start);
+    for (i = 0; i < starts.length; i++) starts[i].addEventListener('click', Util.guard(start));
     var nexts = Util.qa(screen, 'data-gp-next');
-    for (i = 0; i < nexts.length; i++) nexts[i].addEventListener('click', next);
+    for (i = 0; i < nexts.length; i++) nexts[i].addEventListener('click', Util.guard(next));
     var resets = Util.qa(screen, 'data-gp-reset');
-    for (i = 0; i < resets.length; i++) resets[i].addEventListener('click', reset);
+    for (i = 0; i < resets.length; i++) resets[i].addEventListener('click', Util.guard(reset));
+    // 答案切換不套 guard，保持切換即時
+    var toggles = Util.qa(screen, 'data-gp-answer-toggle');
+    for (i = 0; i < toggles.length; i++) toggles[i].addEventListener('click', toggleAnswer);
   }
 
   return {
@@ -392,6 +508,9 @@ var Charades = (function () {
 
   // 開始遊戲（全新一輪）：載入→洗牌→存檔
   function start() {
+    // 趁使用者手勢當下解鎖音訊，稍後「時間到」的提示音才響得出來（iPadOS Safari）
+    Util.unlockAudio();
+
     var secs = parseInt(dom.seconds.value, 10);
     if (isNaN(secs) || secs < 1) secs = 60;
 
@@ -463,6 +582,9 @@ var Charades = (function () {
       Util.loadJSON(DATA_PATH).then(function (data) { words = data; });
     } else {
       state = null;
+      // 沒有進行中存檔時，明確設回預設 60 秒
+      // （不依賴 HTML value，因瀏覽器重載時會還原使用者上次輸入的值蓋掉它）
+      dom.seconds.value = 60;
     }
     showPhase('lobby');
   }
@@ -476,13 +598,13 @@ var Charades = (function () {
     if (!screen) cacheDom();
     var i;
     var starts = Util.qa(screen, 'data-ch-start');
-    for (i = 0; i < starts.length; i++) starts[i].addEventListener('click', start);
-    dom.correctBtn.addEventListener('click', answerCorrect);
-    dom.passBtn.addEventListener('click', pass);
+    for (i = 0; i < starts.length; i++) starts[i].addEventListener('click', Util.guard(start));
+    dom.correctBtn.addEventListener('click', Util.guard(answerCorrect));
+    dom.passBtn.addEventListener('click', Util.guard(pass));
     var nr = Util.qa(screen, 'data-ch-nextround');
-    for (i = 0; i < nr.length; i++) nr[i].addEventListener('click', nextRound);
+    for (i = 0; i < nr.length; i++) nr[i].addEventListener('click', Util.guard(nextRound));
     var resets = Util.qa(screen, 'data-ch-reset');
-    for (i = 0; i < resets.length; i++) resets[i].addEventListener('click', reset);
+    for (i = 0; i < resets.length; i++) resets[i].addEventListener('click', Util.guard(reset));
   }
 
   return {
@@ -510,10 +632,10 @@ var Playlists = (function () {
         var btn = document.createElement('button');
         btn.className = 'btn btn-primary';
         btn.textContent = item.title;
-        btn.addEventListener('click', function () {
+        btn.addEventListener('click', Util.guard(function () {
           // 開啟對應 YouTube Music 歌單（網址由 JSON 維護）
           window.open(item.url, '_blank');
-        });
+        }));
         menu.appendChild(btn);
       });
       built = true;

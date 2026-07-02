@@ -19,7 +19,7 @@ iPad 派對主持工具（PWA）。純 HTML / CSS / JavaScript，無框架、無
 | `data/playlists.json` | `[{ "title": "KPOP", "url": "https://music.youtube.com/playlist?list=..." }, ...]` |
 
 - 猜人名的圖片放在 `images/` 資料夾，檔名要與 JSON 的 `image` 欄位一致。
-- 改完 JSON 後，若 PWA 已快取舊版，重新整理一次即可（service worker 會把新 JSON 寫入快取）。
+- 改完 JSON 後，**在有網路的狀態下**重新整理一次即可生效（service worker 對 `data/*.json` 採 network-first，會抓最新版並更新快取）。
 
 ## 本機測試
 

@@ -2,13 +2,16 @@
    VIP Party Tool — service-worker.js
    策略：
    - install：precache 核心靜態資源（HTML/CSS/JS/JSON/icons）
-   - fetch：cache-first（先找快取，沒有再連網並寫入快取）
-            → 讓圖片 (images/) 第一次連網後即可離線使用
+   - fetch：
+       · data/*.json → network-first（先連網抓最新並更新快取，
+         離線才回舊快取）→ 讓「改完 JSON 重整即生效」成立
+       · 其餘 → cache-first（先找快取，沒有再連網並寫入快取）
+         → 讓圖片 (images/) 第一次連網後即可離線使用
    - activate：清除舊版本快取
    更新版本時：把 CACHE_VERSION 改成新數字即可讓快取重建。
    ================================================================= */
 
-var CACHE_VERSION = 'vpt-v1';
+var CACHE_VERSION = 'vpt-v2';
 
 // 安裝時要預先快取的核心檔案（相對路徑，GitHub Pages 子目錄也適用）
 var PRECACHE_URLS = [
@@ -50,24 +53,47 @@ self.addEventListener('activate', function (event) {
   );
 });
 
+// 把成功的回應複製一份寫入快取（只快取自家同源、200 的資源）
+function putInCache(req, res) {
+  if (res && res.status === 200 && res.type === 'basic') {
+    var clone = res.clone();
+    caches.open(CACHE_VERSION).then(function (cache) {
+      cache.put(req, clone);
+    });
+  }
+}
+
+// data/ 底下的 .json 用 network-first；其餘 cache-first
+function isDataJSON(url) {
+  return /\/data\/[^/]+\.json(\?.*)?$/.test(url);
+}
+
 self.addEventListener('fetch', function (event) {
   var req = event.request;
 
   // 只處理 GET
   if (req.method !== 'GET') return;
 
+  // network-first：題庫 JSON 先連網抓最新，離線才回舊快取
+  if (isDataJSON(req.url)) {
+    event.respondWith(
+      fetch(req).then(function (res) {
+        putInCache(req, res);
+        return res;
+      }).catch(function () {
+        return caches.match(req);
+      })
+    );
+    return;
+  }
+
+  // cache-first：其餘靜態資源與圖片
   event.respondWith(
     caches.match(req).then(function (cached) {
-      if (cached) return cached; // cache-first
+      if (cached) return cached;
 
       return fetch(req).then(function (res) {
-        // 連網成功 → 複製一份寫入快取（圖片、之後修改的 JSON 等）
-        if (res && res.status === 200 && res.type === 'basic') {
-          var clone = res.clone();
-          caches.open(CACHE_VERSION).then(function (cache) {
-            cache.put(req, clone);
-          });
-        }
+        putInCache(req, res);
         return res;
       }).catch(function () {
         // 離線且無快取：導覽請求回首頁，其它就讓它失敗

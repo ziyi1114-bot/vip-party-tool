@@ -115,8 +115,9 @@ body {
   font-weight: 800;
 }
 
-/* ---- 待機 / 進行 / 總結 區塊共用排版 ---- */
+/* ---- 待機 / 載入 / 進行 / 總結 區塊共用排版 ---- */
 .game-lobby,
+.game-loading,
 .game-play,
 .game-summary,
 .game-done {
@@ -162,6 +163,15 @@ body {
   height: auto;
   display: block;
 }
+/* 答案顯示（主持人對答用），大字置中 */
+.gp-answer {
+  font-size: 44px;
+  font-weight: 800;
+  text-align: center;
+  color: #ffd873;
+}
+/* 中性色切換鈕，和主要動作鈕（藍）區隔 */
+.btn-toggle { background: #3a4a70; border-color: #5a6c98; }
 
 /* =========================== 比手畫腳 =========================== */
 .seconds-label {
