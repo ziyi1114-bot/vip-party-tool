@@ -153,10 +153,21 @@ body {
   font-weight: 700;
   text-align: center;
 }
+/* 進行中：圖片盡量放大、填滿可用空間；下一題縮小置底 */
+.gp-play {
+  justify-content: flex-start;
+  gap: 12px;
+  max-width: none; /* 解除 640px 限制，讓圖片可用整個寬度 */
+}
+.gp-counter {
+  flex: 0 0 auto;
+  font-size: 22px; /* 縮小讓位給圖片 */
+}
 .gp-image-box {
   width: 100%;
-  /* 用固定高度的圖框，避免換圖時版面跳動 */
-  height: 56vh;
+  /* 用 flex 填滿標題與按鈕之間的所有高度，圖片才會最大 */
+  flex: 1 1 auto;
+  min-height: 0; /* 允許收縮，避免內容溢出 */
   background: #1a2745;
   border: 3px solid #44588a;
   border-radius: 16px;
@@ -166,21 +177,22 @@ body {
   overflow: hidden;
 }
 .gp-image {
+  /* 完整顯示不裁切（任何比例都置中放到最大） */
   max-width: 100%;
   max-height: 100%;
   width: auto;
   height: auto;
   display: block;
 }
-/* 答案顯示（主持人對答用），大字置中 */
-.gp-answer {
-  font-size: 44px;
-  font-weight: 800;
-  text-align: center;
-  color: #ffd873;
+/* 下一題：不用太大，置中放底部 */
+.gp-next {
+  flex: 0 0 auto;
+  width: auto;
+  max-width: 360px;
+  margin: 0 auto;
+  padding: 16px 40px;
+  font-size: 24px;
 }
-/* 中性色切換鈕，和主要動作鈕（藍）區隔 */
-.btn-toggle { background: #3a4a70; border-color: #5a6c98; }
 
 /* =========================== 比手畫腳 =========================== */
 .seconds-label {

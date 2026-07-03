@@ -16,7 +16,7 @@
 
 /* 顯示在首頁的版本號。發新版時把這裡與 service-worker.js 的 CACHE_VERSION
    一起 +1（見 CLAUDE.md），使用者就能在首頁確認裝置吃到哪一版。 */
-var APP_VERSION = 'v4';
+var APP_VERSION = 'v5';
 
 /* =================================================================
    共用工具模組
@@ -283,12 +283,21 @@ var GuessPeople = (function () {
   var DATA_PATH = 'data/guess-people.json';
   var WINDOW = 5;       // 預載視窗大小（前幾張優先 + 後方維持張數）
 
-  var people = [];      // 原始題庫（含 name/image）
+  var people = [];      // 原始題庫（圖片相對路徑字串陣列）
   var screen, dom = {}; // DOM 參照
   var state = null;     // { order:[原始index...], idx:Number }
   var preloadedSet = {};// 已預載的原始 index（避免重複建 Image）
   var loading = false;  // 前幾張圖預載中（避免長時間下載期間重複觸發開始）
-  var answerShown = false; // 目前是否顯示答案（僅檢視狀態，不寫進存檔）
+
+  // 正規化題庫：相容純字串路徑與舊格式 { name, image } 物件
+  function normalize(data) {
+    var out = [];
+    for (var i = 0; i < data.length; i++) {
+      var item = data[i];
+      out.push(typeof item === 'string' ? item : item.image);
+    }
+    return out;
+  }
 
   function cacheDom() {
     screen = document.getElementById('screen-guess-people');
@@ -298,8 +307,6 @@ var GuessPeople = (function () {
     dom.done    = Util.q(screen, 'data-gp-done');
     dom.counter = Util.q(screen, 'data-gp-counter');
     dom.image   = Util.q(screen, 'data-gp-image');
-    dom.answer       = Util.q(screen, 'data-gp-answer');
-    dom.answerToggle = Util.q(screen, 'data-gp-answer-toggle');
     // 可見圖片載入失敗也記一筆，避免破圖無提示
     dom.image.onerror = function () {
       console.warn('圖片載入失敗：' + dom.image.src);
@@ -336,7 +343,7 @@ var GuessPeople = (function () {
       var origIdx = state.order[i];
       if (preloadedSet[origIdx]) continue;
       preloadedSet[origIdx] = true;
-      promises.push(preloadImage(people[origIdx].image));
+      promises.push(preloadImage(people[origIdx]));
     }
     return Promise.all(promises);
   }
@@ -351,49 +358,23 @@ var GuessPeople = (function () {
     }
     showPhase('play');
 
-    var person = people[state.order[state.idx]];
+    var imgSrc = people[state.order[state.idx]];
     // 只更新 img.src（不重建節點）；已預載者會直接命中快取
-    dom.image.src = person.image;
+    dom.image.src = imgSrc;
     dom.image.alt = '人物圖片';
 
     var remain = state.order.length - state.idx;
     dom.counter.textContent = '剩餘題數：' + remain;
 
-    // 換題自動恢復隱藏答案
-    hideAnswer();
-
     // 維持後方約 WINDOW 張預載（不等按下一題才下載）
     preloadWindow(state.idx, WINDOW);
-  }
-
-  // 隱藏答案並重置切換鈕
-  function hideAnswer() {
-    answerShown = false;
-    if (dom.answer) {
-      dom.answer.classList.add('hidden');
-      dom.answer.textContent = '';
-    }
-    if (dom.answerToggle) dom.answerToggle.textContent = '顯示答案';
-  }
-
-  // 切換答案顯示／隱藏
-  function toggleAnswer() {
-    if (!state || state.idx >= state.order.length) return;
-    answerShown = !answerShown;
-    if (answerShown) {
-      dom.answer.textContent = people[state.order[state.idx]].name;
-      dom.answer.classList.remove('hidden');
-      dom.answerToggle.textContent = '隱藏答案';
-    } else {
-      hideAnswer();
-    }
   }
 
   // 開始遊戲：載入題庫 → 洗牌 → 存檔 → 優先預載前 WINDOW 張 → 進入
   function start() {
     if (loading) return; // 前幾張還在載，忽略重複觸發
     Util.loadJSON(DATA_PATH).then(function (data) {
-      people = data;
+      people = normalize(data);
       var order = [];
       for (var i = 0; i < people.length; i++) order.push(i);
       Util.shuffle(order);
@@ -430,7 +411,6 @@ var GuessPeople = (function () {
     Util.storage.remove(KEY);
     state = null;
     preloadedSet = {};
-    hideAnswer();
     showPhase('lobby');
   }
 
@@ -441,7 +421,7 @@ var GuessPeople = (function () {
     if (saved && saved.order && saved.order.length) {
       // 接續進度，需要把題庫載回記憶體才能取圖
       Util.loadJSON(DATA_PATH).then(function (data) {
-        people = data;
+        people = normalize(data);
         state = saved;
         preloadedSet = {};
         render(); // 會預熱目前位置附近的圖
@@ -464,9 +444,6 @@ var GuessPeople = (function () {
     for (i = 0; i < nexts.length; i++) nexts[i].addEventListener('click', Util.guard(next));
     var resets = Util.qa(screen, 'data-gp-reset');
     for (i = 0; i < resets.length; i++) resets[i].addEventListener('click', Util.guard(reset));
-    // 答案切換不套 guard，保持切換即時
-    var toggles = Util.qa(screen, 'data-gp-answer-toggle');
-    for (i = 0; i < toggles.length; i++) toggles[i].addEventListener('click', toggleAnswer);
   }
 
   return {
