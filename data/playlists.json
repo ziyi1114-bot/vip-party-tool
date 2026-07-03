@@ -1,8 +1,34 @@
 [
-  { "title": "測試歌單（喜歡的音樂）", "url": "https://music.youtube.com/playlist?list=LM" },
-  { "title": "童年回憶", "url": "https://music.youtube.com/playlist?list=xxxxx" },
-  { "title": "KPOP", "url": "https://music.youtube.com/playlist?list=xxxxx" },
-  { "title": "動漫", "url": "https://music.youtube.com/playlist?list=xxxxx" },
-  { "title": "世界巡禮", "url": "https://music.youtube.com/playlist?list=xxxxx" },
-  { "title": "我的最愛", "url": "https://music.youtube.com/playlist?list=xxxxx" }
+  {
+    "title": "KTV必點",
+    "url": "https://music.youtube.com/playlist?list=PLSNYJP3JLrFw"
+  },
+  {
+    "title": "洗腦神曲",
+    "url": "https://music.youtube.com/playlist?list=PLFJZgLJB-rlI"
+  },
+  {
+    "title": "畢旅遊覽車",
+    "url": "https://music.youtube.com/playlist?list=PLBIkaRPhJpa4"
+  },
+  {
+    "title": "童年經典",
+    "url": "https://music.youtube.com/playlist?list=PLR4OlFOVtKoo"
+  },
+  {
+    "title": "辣個男人",
+    "url": "https://music.youtube.com/playlist?list=PLVi-Mv3wA3jo"
+  },
+  {
+    "title": "經典OTS",
+    "url": "https://music.youtube.com/playlist?list=PLVkgPAnOKLTo"
+  },
+  {
+    "title": "官司纏身",
+    "url": "https://music.youtube.com/playlist?list=PLdAzN6SAzkqQ"
+  },
+  {
+    "title": "MTV台",
+    "url": "https://music.youtube.com/playlist?list=PLcERV0ex7h7U"
+  }
 ]
