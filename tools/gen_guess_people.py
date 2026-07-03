@@ -24,6 +24,13 @@ import re
 import sys
 from urllib.parse import quote
 
+# Windows 主控台預設可能是 cp950，印出含特殊字元的舊檔名會 UnicodeEncodeError。
+# 改用 UTF-8 並對無法編碼者以替代字元輸出，避免因「印報告」而崩潰。
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 # 支援的圖片副檔名（小寫比對）。.jfif/.jpe 都是 JPEG 變體，瀏覽器可正常顯示
 IMAGE_EXTS = {".jpg", ".jpeg", ".jpe", ".jfif", ".png", ".gif", ".webp"}
 

@@ -12,7 +12,7 @@
    ================================================================= */
 
 // 發新版時，把此處與 script.js 的 APP_VERSION 一起 +1（見 CLAUDE.md）
-var CACHE_VERSION = 'vpt-v5';
+var CACHE_VERSION = 'vpt-v6';
 
 // 安裝時要預先快取的核心檔案（相對路徑，GitHub Pages 子目錄也適用）
 var PRECACHE_URLS = [

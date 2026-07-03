@@ -16,7 +16,7 @@
 
 /* 顯示在首頁的版本號。發新版時把這裡與 service-worker.js 的 CACHE_VERSION
    一起 +1（見 CLAUDE.md），使用者就能在首頁確認裝置吃到哪一版。 */
-var APP_VERSION = 'v5';
+var APP_VERSION = 'v6';
 
 /* =================================================================
    共用工具模組
@@ -364,7 +364,7 @@ var GuessPeople = (function () {
     dom.image.alt = '人物圖片';
 
     var remain = state.order.length - state.idx;
-    dom.counter.textContent = '剩餘題數：' + remain;
+    dom.counter.textContent = '剩餘圖片：' + remain + ' / ' + state.order.length;
 
     // 維持後方約 WINDOW 張預載（不等按下一題才下載）
     preloadWindow(state.idx, WINDOW);
